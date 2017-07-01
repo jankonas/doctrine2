@@ -15,7 +15,12 @@ before_script:
   - if [[ $TRAVIS_PHP_VERSION = '5.6' && $DB = 'sqlite' ]]; then PHPUNIT_FLAGS="--coverage-clover ./build/logs/clover.xml"; else PHPUNIT_FLAGS=""; fi
   - if [[ $PHPUNIT_FLAGS == "" ]]; then phpenv config-rm xdebug.ini; fi
   - composer self-update
-  - composer install --prefer-source --dev
+  - composer install --prefer-source
+  - if [ "$DEPENDENCIES" != "low" ]; then composer update; fi;
+  - if [ "$DEPENDENCIES" == "low" ]; then composer update --prefer-lowest; fi;
+  - if [[ $PHPSTAN = 1 ]]; then composer require --dev --prefer-stable phpstan/phpstan:^0.7 symfony/console:^3.0; fi
+  - if [ "$MYSQL_VERSION" == "5.7" ]; then bash ./tests/travis/install-mysql-5.7.sh; fi;
+  - if [[ $DB == "mysql" || $DB == "mariadb" ]]; then mysql -e "CREATE SCHEMA doctrine_tests; GRANT ALL PRIVILEGES ON doctrine_tests.* to travis@'%'"; fi;
 
 script:
   - ENABLE_SECOND_LEVEL_CACHE=0 ./vendor/bin/phpunit -v -c tests/travis/$DB.travis.xml $PHPUNIT_FLAGS
@@ -23,6 +28,27 @@ script:
 
 matrix:
   fast_finish: true
+  include:
+    - php: 7.1
+      env: DB=mariadb
+      addons:
+        mariadb: 10.1
+    - php: 7.1
+      env:
+        - DB=sqlite
+        - DEPENDENCIES='low'
+    - php: 7.1
+      env:
+        - DB=pgsql
+        - PHPSTAN=1
+
+    - php: 7.1
+      env: DB=mysql MYSQL_VERSION=5.7
+      sudo: required
+    - php: nightly
+      env: DB=mysql MYSQL_VERSION=5.7
+      sudo: required
+
   allow_failures:
     - php: 7.0
 
